@@ -1,0 +1,690 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1" />
+  <title>연금복권720+ 빈도 기반 추천 (실시간 데이터 연동)</title>
+  <meta name="description" content="연금복권720+ 역대 1등 당첨(조+6자리) 데이터를 기반으로, 자리별 빈도(십만~일)로 추천번호를 생성합니다. (무작위 X)" />
+  <style>
+    :root{
+      --bg:#0b1020;
+      --card:#121a33;
+      --card2:#0f1730;
+      --txt:#e9ecff;
+      --muted:#aab2da;
+      --line:#22305e;
+      --shadow: 0 10px 30px rgba(0,0,0,.35);
+
+      /* 자리별 컬러(십만~일) */
+      --c1:#ff6b6b; /* 십만 */
+      --c2:#ffd166; /* 만 */
+      --c3:#4ecdc4; /* 천 */
+      --c4:#5f7cff; /* 백 */
+      --c5:#b084ff; /* 십 */
+      --c6:#7ee081; /* 일 */
+      --cg:#ff9f1c; /* 조 */
+    }
+    *{box-sizing:border-box}
+    body{
+      margin:0;
+      background: radial-gradient(1200px 800px at 20% 10%, rgba(95,124,255,.25), transparent 60%),
+                  radial-gradient(1000px 700px at 90% 20%, rgba(176,132,255,.18), transparent 60%),
+                  radial-gradient(900px 600px at 60% 90%, rgba(78,205,196,.15), transparent 60%),
+                  var(--bg);
+      color:var(--txt);
+      font-family: ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, "Noto Sans KR", Arial, "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
+    }
+    a{color:inherit}
+    .wrap{max-width:1100px;margin:0 auto;padding:24px 16px 60px}
+    .hero{
+      display:flex;gap:16px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;
+      margin-bottom:18px;
+    }
+    .title{
+      font-size: clamp(20px, 3.2vw, 34px);
+      font-weight:900;letter-spacing:-.5px;line-height:1.15;margin:0 0 8px;
+    }
+    .subtitle{
+      margin:0;
+      color:var(--muted);
+      line-height:1.5;
+      max-width: 62ch;
+    }
+    .pillrow{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+    .pill{
+      border:1px solid var(--line);
+      background: rgba(18,26,51,.6);
+      padding:8px 10px;border-radius:999px;
+      color:var(--muted);
+      font-size:12px;
+    }
+
+    .grid{
+      display:grid;
+      grid-template-columns: 1.2fr .8fr;
+      gap:16px;
+      margin-top:16px;
+    }
+    @media (max-width: 900px){
+      .grid{grid-template-columns: 1fr}
+    }
+
+    .card{
+      background: linear-gradient(180deg, rgba(18,26,51,.92), rgba(15,23,48,.92));
+      border:1px solid rgba(34,48,94,.7);
+      border-radius:18px;
+      box-shadow:var(--shadow);
+      overflow:hidden;
+    }
+    .card .hd{
+      padding:16px 16px 10px;
+      border-bottom:1px solid rgba(34,48,94,.6);
+      display:flex;align-items:center;justify-content:space-between;gap:10px;flex-wrap:wrap;
+    }
+    .card .hd h2{
+      margin:0;font-size:16px;letter-spacing:-.2px;
+    }
+    .card .bd{padding:16px}
+
+    .btnrow{display:flex;gap:10px;flex-wrap:wrap}
+    button{
+      border:1px solid rgba(255,255,255,.10);
+      background: rgba(255,255,255,.06);
+      color:var(--txt);
+      padding:10px 12px;
+      border-radius:12px;
+      cursor:pointer;
+      font-weight:700;
+      letter-spacing:-.2px;
+      transition: transform .05s ease, background .15s ease, border-color .15s ease;
+      user-select:none;
+    }
+    button:hover{background: rgba(255,255,255,.10);border-color: rgba(255,255,255,.18)}
+    button:active{transform: translateY(1px)}
+    button.primary{
+      background: rgba(95,124,255,.16);
+      border-color: rgba(95,124,255,.35);
+    }
+    button.primary:hover{background: rgba(95,124,255,.22)}
+    button.danger{
+      background: rgba(255,107,107,.12);
+      border-color: rgba(255,107,107,.28);
+    }
+    button.danger:hover{background: rgba(255,107,107,.18)}
+    button:disabled{opacity:.55;cursor:not-allowed}
+
+    .notice{
+      padding:10px 12px;
+      border-radius:12px;
+      border:1px dashed rgba(255,255,255,.18);
+      background: rgba(0,0,0,.12);
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .sets{
+      display:flex;flex-direction:column;gap:12px;margin-top:14px;
+    }
+    .set{
+      border:1px solid rgba(34,48,94,.7);
+      background: rgba(0,0,0,.12);
+      border-radius:16px;
+      padding:12px;
+      display:flex;
+      justify-content:space-between;
+      align-items:center;
+      gap:12px;
+      flex-wrap:wrap;
+    }
+    .set .meta{
+      display:flex;align-items:center;gap:10px;flex-wrap:wrap;
+      color: var(--muted);
+      font-size: 12px;
+    }
+    .badge{
+      display:inline-flex;align-items:center;gap:6px;
+      padding:6px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      color: var(--txt);
+      font-weight:800;
+    }
+    .balls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+    .ball{
+      width:44px;height:44px;border-radius:999px;
+      display:flex;align-items:center;justify-content:center;
+      font-weight:900;font-size:18px;
+      box-shadow: 0 12px 22px rgba(0,0,0,.28);
+      border:1px solid rgba(255,255,255,.16);
+    }
+    .ball.small{width:34px;height:34px;font-size:14px}
+    .pos1{background: color-mix(in srgb, var(--c1), #000 15%)}
+    .pos2{background: color-mix(in srgb, var(--c2), #000 15%)}
+    .pos3{background: color-mix(in srgb, var(--c3), #000 15%)}
+    .pos4{background: color-mix(in srgb, var(--c4), #000 15%)}
+    .pos5{background: color-mix(in srgb, var(--c5), #000 15%)}
+    .pos6{background: color-mix(in srgb, var(--c6), #000 15%)}
+    .grp{background: color-mix(in srgb, var(--cg), #000 18%)}
+
+    .kv{
+      display:grid;
+      grid-template-columns: 1fr 1fr;
+      gap:10px;
+      margin-top: 10px;
+    }
+    .k{
+      padding:12px;border-radius:14px;
+      background: rgba(0,0,0,.10);
+      border:1px solid rgba(34,48,94,.6);
+    }
+    .k .label{color:var(--muted);font-size:12px}
+    .k .value{margin-top:4px;font-weight:900}
+
+    .freq{
+      display:flex;flex-direction:column;gap:12px;
+    }
+    .freqRow{
+      border:1px solid rgba(34,48,94,.65);
+      background: rgba(0,0,0,.10);
+      border-radius:14px;
+      padding:12px;
+    }
+    .freqRow h3{margin:0 0 8px;font-size:13px;color:var(--muted);font-weight:900}
+    .topDigits{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .topDigits .chip{
+      display:inline-flex;align-items:center;gap:8px;
+      padding:6px 10px;border-radius:999px;
+      border:1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.06);
+      font-size:12px;
+      color:var(--txt);
+      font-weight:800;
+    }
+    .chip .count{color:var(--muted);font-weight:800}
+    .foot{
+      margin-top:18px;color:var(--muted);font-size:12px;line-height:1.45
+    }
+    .mono{font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace}
+    .row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+    .sep{height:1px;background:rgba(34,48,94,.55);margin:14px 0}
+    .toast{
+      position:fixed;left:50%;bottom:18px;transform:translateX(-50%);
+      background: rgba(0,0,0,.68);
+      border:1px solid rgba(255,255,255,.14);
+      color: var(--txt);
+      padding:10px 12px;border-radius:14px;
+      font-size:13px;
+      opacity:0;pointer-events:none;
+      transition: opacity .2s ease, transform .2s ease;
+    }
+    .toast.show{opacity:1;transform:translateX(-50%) translateY(-4px)}
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="hero">
+      <div>
+        <h1 class="title">연금복권720+ 빈도 기반 추천번호</h1>
+        <p class="subtitle">
+          “무작위 생성” 없이, <b>역대 1등(조+6자리) 당첨 데이터</b>를 자리별(십만~일)로 집계해서
+          <b>빈도 기반</b>으로 추천 번호를 뽑아준다.
+          데이터는 GitHub Actions가 자동으로 갱신하고, 이 페이지는 JSON을 “실시간”으로 불러온다.
+        </p>
+        <div class="pillrow">
+          <div class="pill">추천: 1개 / 5개 / 10개</div>
+          <div class="pill">자리별 색상(십만~일)</div>
+          <div class="pill">PC·모바일 최적화</div>
+          <div class="pill">공유 링크 생성</div>
+        </div>
+      </div>
+      <div class="row">
+        <button class="primary" id="btnReload">데이터 새로고침</button>
+        <button id="btnCopyLink" disabled>추천 링크 복사</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <section class="card">
+        <div class="hd">
+          <h2>추천 번호</h2>
+          <div class="btnrow">
+            <button class="primary" id="btn1" disabled>번호 1개 추천</button>
+            <button class="primary" id="btn5" disabled>번호 5개 추천</button>
+            <button class="primary" id="btn10" disabled>번호 10개 추천</button>
+            <button class="danger" id="btnClear">화면 초기화</button>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="notice" id="statusBox">
+            데이터 로딩 중…
+          </div>
+
+          <div class="kv" id="kv"></div>
+
+          <div class="sep"></div>
+
+          <div class="sets" id="sets"></div>
+
+          <div class="foot">
+            <div>※ 연금복권720+는 <b>조 + 6자리</b> 번호 구조다. :contentReference[oaicite:2]{index=2}</div>
+            <div>※ 2등은 “조만 다르고 6자리는 1등과 동일” 구조로 안내된다. :contentReference[oaicite:3]{index=3}</div>
+            <div>※ 이 페이지는 통계적 참고용이며, 당첨을 보장하지 않는다.</div>
+          </div>
+        </div>
+      </section>
+
+      <aside class="card">
+        <div class="hd">
+          <h2>자리별 빈도 TOP</h2>
+          <div class="row">
+            <span class="pill mono" id="dataInfo">—</span>
+          </div>
+        </div>
+        <div class="bd">
+          <div class="freq" id="freq"></div>
+          <div class="sep"></div>
+          <div class="notice">
+            <b>추천 로직(비랜덤)</b><br/>
+            1) 자리별(십만~일) 숫자 빈도를 계산<br/>
+            2) 각 자리의 상위 후보(기본 4개)로 조합 후보를 만들고 점수화<br/>
+            3) 1개 추천은 “최고 점수”<br/>
+            4) 5/10개 추천은 “최신 회차 기준으로 인덱스를 회전”해서 다양화(랜덤 아님)
+          </div>
+        </div>
+      </aside>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <script>
+    // GitHub Pages 캐시 대비: 강제 최신 JSON 요청(쿼리스트링)
+    const DATA_URL = "./data/yeongeum720_winners.json";
+
+    const $ = (id) => document.getElementById(id);
+
+    const state = {
+      data: null,
+      freq: null,
+      lastSets: null,
+    };
+
+    function toast(msg){
+      const t = $("toast");
+      t.textContent = msg;
+      t.classList.add("show");
+      setTimeout(() => t.classList.remove("show"), 1600);
+    }
+
+    function pad2(n){ return String(n).padStart(2,"0"); }
+
+    function safeJsonParseHash(){
+      // hash 예: #mode=5&sets=4-639566,1-123456
+      const h = location.hash.replace(/^#/, "").trim();
+      if(!h) return null;
+      const params = new URLSearchParams(h.replaceAll("&amp;","&"));
+      const mode = Number(params.get("mode") || 0);
+      const setsRaw = (params.get("sets") || "").trim();
+      if(!mode || !setsRaw) return null;
+      const sets = setsRaw.split(",").map(s=>{
+        const [g, digits] = s.split("-");
+        if(!g || !digits || digits.length!==6) return null;
+        const arr = digits.split("").map(d=>Number(d));
+        if(arr.some(x=>Number.isNaN(x))) return null;
+        return { group:Number(g), digits:arr };
+      }).filter(Boolean);
+      if(!sets.length) return null;
+      return { mode, sets };
+    }
+
+    function setHashFromSets(mode, sets){
+      const packed = sets.map(s => `${s.group}-${s.digits.join("")}`).join(",");
+      const params = new URLSearchParams();
+      params.set("mode", String(mode));
+      params.set("sets", packed);
+      location.hash = params.toString();
+    }
+
+    async function loadData(){
+      $("statusBox").textContent = "데이터 로딩 중…";
+      $("sets").innerHTML = "";
+      $("kv").innerHTML = "";
+      $("freq").innerHTML = "";
+      $("dataInfo").textContent = "—";
+      $("btnCopyLink").disabled = true;
+      state.lastSets = null;
+
+      let json;
+      try{
+        const res = await fetch(`${DATA_URL}?v=${Date.now()}`, { cache:"no-store" });
+        if(!res.ok) throw new Error(`HTTP ${res.status}`);
+        json = await res.json();
+      }catch(err){
+        $("statusBox").innerHTML = `
+          데이터 로딩 실패: <span class="mono">${String(err.message || err)}</span><br/>
+          <br/>1) <span class="mono">data/yeongeum720_winners.json</span> 경로 확인
+          <br/>2) GitHub Actions로 데이터가 생성/갱신됐는지 확인
+        `;
+        disableBtns(true);
+        return;
+      }
+
+      // 기대 구조: { updatedAt, draws:[{round,date,group,digits:[...]}, ...] }
+      if(!json || !Array.isArray(json.draws) || json.draws.length === 0){
+        $("statusBox").textContent = "데이터가 비어있다. GitHub Actions 업데이트 후 다시 시도해줘.";
+        disableBtns(true);
+        state.data = json;
+        return;
+      }
+
+      state.data = json;
+      state.freq = buildFrequencies(json.draws);
+
+      // UI 정보
+      const latest = json.draws[json.draws.length - 1];
+      const total = json.draws.length;
+      const up = json.updatedAt ? new Date(json.updatedAt) : null;
+
+      $("statusBox").innerHTML = `
+        ✅ 데이터 준비 완료<br/>
+        · 누적 회차: <b>${total}</b>개<br/>
+        · 최신 회차: <b>${latest.round}</b>회 (${latest.date || "날짜 미상"})<br/>
+        · 갱신 시각: <b>${up ? up.toLocaleString() : "—"}</b>
+      `;
+
+      $("dataInfo").textContent = `draws=${total} · latest=${latest.round} · updated=${up ? up.toISOString().slice(0,19)+"Z" : "—"}`;
+
+      renderKV(json, latest);
+      renderFreq(state.freq);
+
+      disableBtns(false);
+
+      // hash로 공유된 추천이 있으면 그대로 렌더
+      const shared = safeJsonParseHash();
+      if(shared && shared.sets && shared.sets.length){
+        renderSets(shared.sets, shared.mode, "공유 링크로 불러온 추천");
+        state.lastSets = { mode: shared.mode, sets: shared.sets };
+        $("btnCopyLink").disabled = false;
+      }
+    }
+
+    function disableBtns(disabled){
+      $("btn1").disabled = disabled;
+      $("btn5").disabled = disabled;
+      $("btn10").disabled = disabled;
+    }
+
+    function renderKV(json, latest){
+      const g = mostFrequent(state.freq.groupCounts);
+      const posTop = state.freq.posCounts.map((arr)=> mostFrequentArr(arr).digit);
+
+      const html = `
+        <div class="k">
+          <div class="label">가장 많이 나온 조</div>
+          <div class="value"><span class="badge"><span class="ball small grp">${g.digit}</span> 조</span> <span class="mono">(${g.count}회)</span></div>
+        </div>
+        <div class="k">
+          <div class="label">각 자리 TOP(십만~일)</div>
+          <div class="value mono">${posTop.join("")}</div>
+        </div>
+      `;
+      $("kv").innerHTML = html;
+    }
+
+    function buildFrequencies(draws){
+      const groupCounts = new Map();
+      const posCounts = Array.from({length:6}, ()=> Array(10).fill(0));
+
+      for(const d of draws){
+        const g = Number(d.group);
+        groupCounts.set(g, (groupCounts.get(g)||0) + 1);
+
+        const digits = d.digits || [];
+        if(digits.length === 6){
+          for(let i=0;i<6;i++){
+            const x = Number(digits[i]);
+            if(Number.isFinite(x) && x>=0 && x<=9) posCounts[i][x] += 1;
+          }
+        }
+      }
+      return { groupCounts, posCounts };
+    }
+
+    function mostFrequent(map){
+      let best = { digit:null, count:-1 };
+      for(const [k,v] of map.entries()){
+        if(v > best.count || (v===best.count && k < best.digit)){
+          best = { digit:k, count:v };
+        }
+      }
+      return best;
+    }
+
+    function mostFrequentArr(arr){
+      let best = { digit:0, count: arr[0]||0 };
+      for(let i=1;i<arr.length;i++){
+        if(arr[i] > best.count){
+          best = { digit:i, count:arr[i] };
+        }
+      }
+      return best;
+    }
+
+    function topKDigits(arr, k){
+      const tmp = arr.map((count,digit)=>({digit, count}));
+      tmp.sort((a,b)=> b.count - a.count || a.digit - b.digit);
+      return tmp.slice(0,k);
+    }
+
+    function renderFreq(freq){
+      const labels = ["십만", "만", "천", "백", "십", "일"];
+      const classes = ["pos1","pos2","pos3","pos4","pos5","pos6"];
+
+      let html = "";
+
+      // 조 TOP3
+      const groups = [...freq.groupCounts.entries()].map(([digit,count])=>({digit, count}));
+      groups.sort((a,b)=> b.count - a.count || a.digit - b.digit);
+      html += `
+        <div class="freqRow">
+          <h3>조(그룹) TOP</h3>
+          <div class="topDigits">
+            ${groups.slice(0,5).map(x=>`
+              <span class="chip">
+                <span class="ball small grp">${x.digit}</span>
+                <span class="count">${x.count}회</span>
+              </span>
+            `).join("")}
+          </div>
+        </div>
+      `;
+
+      for(let i=0;i<6;i++){
+        const tops = topKDigits(freq.posCounts[i], 5);
+        html += `
+          <div class="freqRow">
+            <h3>${labels[i]} 자리 TOP</h3>
+            <div class="topDigits">
+              ${tops.map(x=>`
+                <span class="chip">
+                  <span class="ball small ${classes[i]}">${x.digit}</span>
+                  <span class="count">${x.count}회</span>
+                </span>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }
+      $("freq").innerHTML = html;
+    }
+
+    function scoreCombo(freq, combo){
+      // 로그 점수(큰 수 안정)
+      const lg = Math.log((freq.groupCounts.get(combo.group)||0) + 1);
+      let s = lg;
+      for(let i=0;i<6;i++){
+        const c = freq.posCounts[i][combo.digits[i]] || 0;
+        s += Math.log(c + 1);
+      }
+      return s;
+    }
+
+    function generateRecommendations(n){
+      const draws = state.data.draws;
+      const latestRound = draws[draws.length - 1].round;
+
+      // 후보 폭(비랜덤): 자리별 상위 4개, 조는 상위 5개
+      const groupCandidates = [...state.freq.groupCounts.entries()]
+        .map(([digit,count])=>({digit, count}))
+        .sort((a,b)=> b.count - a.count || a.digit - b.digit)
+        .slice(0, 5)
+        .map(x=>x.digit);
+
+      const digitCandidates = state.freq.posCounts.map(arr => topKDigits(arr, 4).map(x=>x.digit));
+
+      // 후보 조합 생성(최대 5 * 4^6 = 20480)
+      const combos = [];
+      for(const g of groupCandidates){
+        for(const d1 of digitCandidates[0]){
+          for(const d2 of digitCandidates[1]){
+            for(const d3 of digitCandidates[2]){
+              for(const d4 of digitCandidates[3]){
+                for(const d5 of digitCandidates[4]){
+                  for(const d6 of digitCandidates[5]){
+                    combos.push({ group:g, digits:[d1,d2,d3,d4,d5,d6] });
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+
+      combos.sort((a,b)=>{
+        const sb = scoreCombo(state.freq, b);
+        const sa = scoreCombo(state.freq, a);
+        if(sb !== sa) return sb - sa;
+        // tie-break: 숫자 사전순
+        const ax = `${a.group}${a.digits.join("")}`;
+        const bx = `${b.group}${b.digits.join("")}`;
+        return ax.localeCompare(bx);
+      });
+
+      if(n === 1){
+        return [combos[0]];
+      }
+
+      // 다양화(비랜덤): 최신 회차로 시작점/간격 결정
+      const out = [];
+      const start = latestRound % combos.length;
+      const step = Math.max(7, Math.floor(combos.length / (n * 3))); // 너무 촘촘하면 비슷해져서 간격 확보
+      const seen = new Set();
+      let idx = start;
+
+      // 첫 세트는 항상 최고점(체감상 “정답 느낌”)
+      const firstKey = `${combos[0].group}-${combos[0].digits.join("")}`;
+      out.push(combos[0]);
+      seen.add(firstKey);
+
+      while(out.length < n){
+        const c = combos[idx];
+        const key = `${c.group}-${c.digits.join("")}`;
+        if(!seen.has(key)){
+          out.push(c);
+          seen.add(key);
+        }
+        idx = (idx + step) % combos.length;
+        // 안전장치(무한루프 방지)
+        if(seen.size > combos.length * 0.8) break;
+      }
+
+      // 부족하면 앞에서부터 채움
+      for(const c of combos){
+        if(out.length >= n) break;
+        const key = `${c.group}-${c.digits.join("")}`;
+        if(!seen.has(key)){
+          out.push(c);
+          seen.add(key);
+        }
+      }
+      return out.slice(0,n);
+    }
+
+    function renderSets(sets, mode, title){
+      const labels = ["십만","만","천","백","십","일"];
+      const classes = ["pos1","pos2","pos3","pos4","pos5","pos6"];
+
+      $("sets").innerHTML = sets.map((s,idx)=>{
+        const numStr = s.digits.join("");
+        return `
+          <div class="set">
+            <div class="meta">
+              <span class="badge">#${idx+1}</span>
+              <span class="badge"><span class="ball small grp">${s.group}</span> 조</span>
+              <span class="mono">${numStr}</span>
+            </div>
+            <div class="balls" aria-label="추천번호">
+              <div class="ball grp" title="조">${s.group}</div>
+              ${s.digits.map((d,i)=>`
+                <div class="ball ${classes[i]}" title="${labels[i]} 자리">${d}</div>
+              `).join("")}
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      $("btnCopyLink").disabled = false;
+      $("statusBox").innerHTML = `✅ ${title || "추천 완료"} · ${mode}개 세트 생성`;
+    }
+
+    function doRecommend(n){
+      if(!state.data || !state.freq) return;
+      const sets = generateRecommendations(n);
+      renderSets(sets, n, "추천 완료");
+      state.lastSets = { mode:n, sets };
+      setHashFromSets(n, sets);
+    }
+
+    // 이벤트
+    $("btn1").addEventListener("click", ()=> doRecommend(1));
+    $("btn5").addEventListener("click", ()=> doRecommend(5));
+    $("btn10").addEventListener("click", ()=> doRecommend(10));
+
+    $("btnReload").addEventListener("click", async ()=>{
+      await loadData();
+      toast("데이터 새로고침 완료");
+    });
+
+    $("btnClear").addEventListener("click", ()=>{
+      $("sets").innerHTML = "";
+      $("btnCopyLink").disabled = true;
+      state.lastSets = null;
+      history.replaceState(null, "", location.pathname + location.search); // hash 제거
+      $("statusBox").textContent = "화면 초기화 완료. 버튼을 눌러 추천을 생성해줘.";
+      toast("초기화됨");
+    });
+
+    $("btnCopyLink").addEventListener("click", async ()=>{
+      if(!state.lastSets) return;
+      const url = location.href;
+      try{
+        await navigator.clipboard.writeText(url);
+        toast("추천 링크 복사 완료");
+      }catch{
+        // fallback
+        const ta = document.createElement("textarea");
+        ta.value = url;
+        document.body.appendChild(ta);
+        ta.select();
+        document.execCommand("copy");
+        ta.remove();
+        toast("추천 링크 복사 완료");
+      }
+    });
+
+    // 초기 로딩
+    loadData();
+  </script>
+</body>
+</html>
