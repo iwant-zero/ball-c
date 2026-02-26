@@ -17,7 +17,6 @@ jobs:
     runs-on: ubuntu-latest
 
     env:
-      # ✅ GitHub 러너에서 node fetch DNS/IPv6 문제 회피용 (IPv4 우선)
       NODE_OPTIONS: --dns-result-order=ipv4first
 
     steps:
@@ -45,20 +44,14 @@ jobs:
           script: |
             const fs = require('fs');
             const path = require('path');
-
             let body = "연금복권720+ 데이터 업데이트가 실패했습니다.\n\n";
             body += `- 실행 시각(UTC): ${new Date().toISOString()}\n`;
             body += `- 워크플로우: ${process.env.GITHUB_WORKFLOW}\n`;
             body += `- 런 ID: ${process.env.GITHUB_RUN_ID}\n\n`;
-
             const errPath = path.join(process.env.GITHUB_WORKSPACE, 'update-error.txt');
             if (fs.existsSync(errPath)) {
-              const err = fs.readFileSync(errPath, 'utf8').slice(0, 6000);
-              body += "```\n" + err + "\n```\n";
-            } else {
-              body += "update-error.txt가 없어 상세 로그를 찾지 못했습니다.\n";
+              body += "```\n" + fs.readFileSync(errPath, 'utf8').slice(0, 6000) + "\n```\n";
             }
-
             await github.rest.issues.create({
               owner: context.repo.owner,
               repo: context.repo.repo,
@@ -74,14 +67,10 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const errPath = path.join(process.env.GITHUB_WORKSPACE, 'update-error.txt');
-
             let msg = "업데이트 실패. 로그:\n\n";
             if (fs.existsSync(errPath)) {
               msg += "```\n" + fs.readFileSync(errPath, 'utf8').slice(0, 3500) + "\n```\n";
-            } else {
-              msg += "(update-error.txt 없음)\n";
             }
-
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
