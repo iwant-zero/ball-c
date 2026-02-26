@@ -1,11 +1,9 @@
 name: update-yeongeum720-data
 
 on:
-  # 매일 21:10 KST (12:10 UTC) — 목요일 추첨 이후에도 자동 반영되게 "매일"로 둠
   schedule:
-    - cron: "10 12 * * *"
+    - cron: "10 12 * * *" # 매일 21:10 KST (12:10 UTC)
   workflow_dispatch:
-  # 이슈 댓글에 /update720 라고 쓰면 수동 실행(“GitHub Issue 자동 실행” 용)
   issue_comment:
     types: [created]
 
@@ -15,9 +13,12 @@ permissions:
 
 jobs:
   update:
-    # issue_comment 트리거는 "/update720" 코멘트가 있을 때만 실행
     if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/update720')
     runs-on: ubuntu-latest
+
+    env:
+      # ✅ GitHub 러너에서 node fetch DNS/IPv6 문제 회피용 (IPv4 우선)
+      NODE_OPTIONS: --dns-result-order=ipv4first
 
     steps:
       - name: Checkout
@@ -37,7 +38,6 @@ jobs:
           commit_message: "chore: update yeongeum720 winners data"
           file_pattern: "data/yeongeum720_winners.json update-error.txt"
 
-      # 실패하면 이슈 자동 생성(스케줄/수동 디스패치에서 특히 유용)
       - name: Create issue on failure
         if: failure() && github.event_name != 'issue_comment'
         uses: actions/github-script@v7
@@ -66,7 +66,6 @@ jobs:
               body
             });
 
-      # issue_comment로 실행했는데 실패한 경우, 원 이슈에 코멘트로 알려줌
       - name: Comment back on failure (issue_comment trigger)
         if: failure() && github.event_name == 'issue_comment'
         uses: actions/github-script@v7
@@ -75,12 +74,14 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const errPath = path.join(process.env.GITHUB_WORKSPACE, 'update-error.txt');
+
             let msg = "업데이트 실패. 로그:\n\n";
             if (fs.existsSync(errPath)) {
               msg += "```\n" + fs.readFileSync(errPath, 'utf8').slice(0, 3500) + "\n```\n";
             } else {
               msg += "(update-error.txt 없음)\n";
             }
+
             await github.rest.issues.createComment({
               owner: context.repo.owner,
               repo: context.repo.repo,
