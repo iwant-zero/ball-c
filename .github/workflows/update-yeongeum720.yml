@@ -1,0 +1,89 @@
+name: update-yeongeum720-data
+
+on:
+  # 매일 21:10 KST (12:10 UTC) — 목요일 추첨 이후에도 자동 반영되게 "매일"로 둠
+  schedule:
+    - cron: "10 12 * * *"
+  workflow_dispatch:
+  # 이슈 댓글에 /update720 라고 쓰면 수동 실행(“GitHub Issue 자동 실행” 용)
+  issue_comment:
+    types: [created]
+
+permissions:
+  contents: write
+  issues: write
+
+jobs:
+  update:
+    # issue_comment 트리거는 "/update720" 코멘트가 있을 때만 실행
+    if: github.event_name != 'issue_comment' || contains(github.event.comment.body, '/update720')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Update data
+        run: node scripts/update-yeongeum720.mjs
+
+      - name: Commit updated data
+        uses: stefanzweifel/git-auto-commit-action@v5
+        with:
+          commit_message: "chore: update yeongeum720 winners data"
+          file_pattern: "data/yeongeum720_winners.json update-error.txt"
+
+      # 실패하면 이슈 자동 생성(스케줄/수동 디스패치에서 특히 유용)
+      - name: Create issue on failure
+        if: failure() && github.event_name != 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+
+            let body = "연금복권720+ 데이터 업데이트가 실패했습니다.\n\n";
+            body += `- 실행 시각(UTC): ${new Date().toISOString()}\n`;
+            body += `- 워크플로우: ${process.env.GITHUB_WORKFLOW}\n`;
+            body += `- 런 ID: ${process.env.GITHUB_RUN_ID}\n\n`;
+
+            const errPath = path.join(process.env.GITHUB_WORKSPACE, 'update-error.txt');
+            if (fs.existsSync(errPath)) {
+              const err = fs.readFileSync(errPath, 'utf8').slice(0, 6000);
+              body += "```\n" + err + "\n```\n";
+            } else {
+              body += "update-error.txt가 없어 상세 로그를 찾지 못했습니다.\n";
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `연금복권720+ 데이터 업데이트 실패 (${new Date().toISOString().slice(0,10)})`,
+              body
+            });
+
+      # issue_comment로 실행했는데 실패한 경우, 원 이슈에 코멘트로 알려줌
+      - name: Comment back on failure (issue_comment trigger)
+        if: failure() && github.event_name == 'issue_comment'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const errPath = path.join(process.env.GITHUB_WORKSPACE, 'update-error.txt');
+            let msg = "업데이트 실패. 로그:\n\n";
+            if (fs.existsSync(errPath)) {
+              msg += "```\n" + fs.readFileSync(errPath, 'utf8').slice(0, 3500) + "\n```\n";
+            } else {
+              msg += "(update-error.txt 없음)\n";
+            }
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.payload.issue.number,
+              body: msg
+            });
